@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf 
 from PIL import Image
 import os 
+import PIL
 from sklearn.model_selection import train_test_split 
 from keras.utils import to_categorical 
 from keras.models import Sequential 
@@ -59,7 +60,7 @@ print(data.shape, labels.shape)
 
 #%% Splitting training and testing dataset
 X_train, X_test, y_train, y_test = train_test_split(data, labels, test_size=0.2, random_state=42)
-print(X_t1.shape, X_t2.shape, y_t1.shape, y_t2.shape)
+print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
 
 
 #%% Converting the labels into one hot encoding
@@ -86,7 +87,7 @@ model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accur
 
 #%% Model Training 
 
-eps = 15
+eps = 3
 anc = model.fit(X_train, y_train, batch_size=32, epochs=eps, validation_data=(X_test, y_test))
 
 #%% Plotting graphs for Accuracy
@@ -143,7 +144,70 @@ for img in imgs:
     image = image.resize((30,30))
     data.append(np.array(image))
 X_test=np.array(data)
-pred = model.predict_classes(X_test)
+#pred = model.predict_classes(X_test)
+# Da Zeile 146 ab Tensorflow 2.6 nicht mehr funktioniert
+pred = model.predict(X_test)
+pred = np.argmax(pred,axis=1)
+
+print(accuracy_score(labels, pred))
+
+#%% Print pic
+#print(pred)
+#print(Image.open(y_test["Path"].values[42]))
+image_42 = Image.open(y_test["Path"].values[42])
+image_42.show()
+
+
+#%% Test attack
+from art.attacks.evasion import FastGradientMethod
+from art.estimators.classification import KerasClassifier
+#tf.compat.v1.disable_eager_execution()
+#%%
+tf.compat.v1.disable_eager_execution()
+#%%
+if tf.__version__[0]!="2":
+    raise ImportError("Tjis notebook requires Tensofrlow v2.")
+
+#%%
+
+# Step 3: Create the ART classifier
+
+classifier = KerasClassifier(model=model, clip_values=(0,30))
+#%%
+X_train = X_train.astype('float32')
+X_test = X_test.astype('float32')
+
+#%% Step 4: Train the ART classifier
+
+classifier.fit(X_train, y_train, nb_epochs=eps)
+
+#%% Step 5: Evaluate the ART classifier on benign test examples
+
+predictions = classifier.predict(X_test)
+predictions = np.argmax(predictions,axis=1)
+print(accuracy_score(labels, predictions))
+
+
+#accuracy = np.sum(np.argmax(predictions, axis=1) == np.argmax(y_test, axis=1)) / len(y_test)
+#print("Accuracy on benign test examples: {}%".format(accuracy * 100))
+
+#%% Step 6: Generate adversarial test examples
+attack = FastGradientMethod(estimator=classifier, eps=0.2)
+x_test_adv = attack.generate(x=X_test)
+
+#%% Step 7: Evaluate the ART classifier on adversarial test examples
+
+predictions = classifier.predict(x_test_adv)
+predictions = np.argmax(predictions,axis=1)
+print(accuracy_score(labels, predictions))
+#accuracy = np.sum(np.argmax(predictions, axis=1) == np.argmax(y_test, axis=1)) / len(y_test)
+#print("Accuracy on adversarial test examples: {}%".format(accuracy * 100))
+
+
+
+
+
+
 
 
 #%% Accuracy with the test data
@@ -152,10 +216,49 @@ print(accuracy_score(labels, pred))
 
 #%% Save the Model
 
-model.save(‘traffic_classifier.h5’)
+#model.save("traffic_classifier.h5")
+
+
+
+#%% 
+from art.estimators.classification import KerasClassifier
+X_train = X_train.astype('float32')
+
+#%%
 
 
 
 
 
 
+
+
+#%% Step 3: Create the ART classifier
+
+classifier = KerasClassifier(model=model)#, use_logits=False, clip_values=(0, 32))
+
+#%% Step 4: Train the ART classifier
+
+classifier.fit(X_train, y_train, batch_size=32, validation_data=(X_test, y_test), nb_epochs=15)
+
+#%% Step 5: Evaluate the ART classifier on benign test examples
+
+predictions = classifier.predict(X_test)
+accuracy = np.sum(np.argmax(predictions, axis=1) == np.argmax(y_test, axis=1)) / len(y_test)
+print("Accuracy on benign test examples: {}%".format(accuracy * 100))
+
+#%% Step 6: Generate adversarial test examples
+attack = FastGradientMethod(estimator=classifier, eps=0.2)
+x_test_adv = attack.generate(x=X_test)
+
+#%% Step 7: Evaluate the ART classifier on adversarial test examples
+
+predictions = classifier.predict(X_test_adv)
+accuracy = np.sum(np.argmax(predictions, axis=1) == np.argmax(y_test, axis=1)) / len(y_test)
+print("Accuracy on adversarial test examples: {}%".format(accuracy * 100))
+
+
+#%%
+from art.attacks.evasion import PixelAttack
+#%%
+attack = PixelAttack(classifier=classifier)
