@@ -26,9 +26,9 @@ from PIL import Image
 import os 
 import PIL
 from sklearn.model_selection import train_test_split 
-from keras.utils import to_categorical 
-from keras.models import Sequential 
-from keras.layers import Conv2D, MaxPool2D, Dense, Flatten, Dropout
+from tensorflow.keras.utils import to_categorical 
+from tensorflow.keras.models import Sequential 
+from tensorflow.keras.layers import Conv2D, MaxPool2D, Dense, Flatten, Dropout
 
 #%% Read the data
 
@@ -253,7 +253,7 @@ x_test_adv = attack.generate(x=X_test)
 
 #%% Step 7: Evaluate the ART classifier on adversarial test examples
 
-predictions = classifier.predict(X_test_adv)
+predictions = classifier.predict(x_test_adv)
 accuracy = np.sum(np.argmax(predictions, axis=1) == np.argmax(y_test, axis=1)) / len(y_test)
 print("Accuracy on adversarial test examples: {}%".format(accuracy * 100))
 
