@@ -138,14 +138,14 @@ perturbation = np.mean(np.abs((x_test_adv - X_test)))
 print('Accuracy on adversarial test data: {:4.2f}%'.format(accuracy_test * 100))
 print('Average perturbation: {:4.2f}'.format(perturbation))
 
-#%% Visualize one attacked image
+#%% Visualize one attacked image, doesn't work yet
 plt.matshow(x_test_adv[0])
 plt.show()
 
 plt.matshow(X_test[0])
 plt.show()
 
-#%% Visualize the performance
+#%% Visualize the performance, doesn't work yet
 
 sns.set_style("darkgrid")
 plt.figure(0)
@@ -171,40 +171,6 @@ plt.show()
 image_42 = Image.open(y_test["Path"].values[42])
 image_42.show()
 
-#%%
-
-# Step 3: Create the ART classifier
-
-#%%
-
-
-#%% Step 4: Train the ART classifier -> clean model
-
-classifier.fit(X_train, y_train, nb_epochs=3)
-
-#%% Step 5: Evaluate the ART classifier on benign test examples
-
-predictions = classifier.predict(X_test)
-predictions = np.argmax(predictions,axis=1)
-print(accuracy_score(labels, predictions))
-
-
-#accuracy = np.sum(np.argmax(predictions, axis=1) == np.argmax(y_test, axis=1)) / len(y_test)
-#print("Accuracy on benign test examples: {}%".format(accuracy * 100))
-
-#%% Step 6: Generate adversarial test examples
-attack = FastGradientMethod(estimator=classifier, eps=5, eps_step=2)
-x_test_adv = attack.generate(x=X_test)
-
-#%% Step 7: Evaluate the ART classifier on adversarial test examples
-
-predictions = classifier.predict(x_test_adv)
-predictions = np.argmax(predictions,axis=1)
-print(accuracy_score(labels, predictions))
-#accuracy = np.sum(np.argmax(predictions, axis=1) == np.argmax(y_test, axis=1)) / len(y_test)
-#print("Accuracy on adversarial test examples: {}%".format(accuracy * 100))
-
-
 
 
 
@@ -212,21 +178,6 @@ print(accuracy_score(labels, predictions))
 #####
 #####
 #####
-
-#%% Accuracy with the test data
-print(accuracy_score(labels, pred))
-
-#%% Save the Model
-
-#model.save("traffic_classifier.h5")
-
-
-
-#%% 
-X_train = X_train.astype('float32')
-
-#%%
-
 
 
 
