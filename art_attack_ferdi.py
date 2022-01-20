@@ -27,6 +27,7 @@ import pandas as pd
 import os 
 from sklearn.model_selection import train_test_split 
 from sklearn.metrics import accuracy_score
+import time
 
 # tensorflow
 import tensorflow as tf 
@@ -44,7 +45,6 @@ from art.estimators.classification import KerasClassifier
 import matplotlib.pyplot as plt
 from PIL import Image
 import seaborn as sns
-
 
 
 #%% Read the data
@@ -83,6 +83,8 @@ y_train = to_categorical(y_train, 43)
 y_test = to_categorical(y_test, 43)
 
 #%% Building the Model
+# Here we should source the model_x file for the creation of the different models
+# This is model_1:
 model = Sequential()
 model.add(Conv2D(filters=32, kernel_size=(5,5), activation='relu', input_shape=X_train.shape[1:]))
 model.add(Conv2D(filters=32, kernel_size=(5,5), activation='relu'))
@@ -100,7 +102,8 @@ model.add(Dense(43, activation='softmax'))
 model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 model.summary()
 
-#%% Create the ART classifier
+#%% Create the ART classifier 
+# -> for some reason, the model has to be created a second time for this to work
 tf.compat.v1.disable_eager_execution() # to make the classifier work
 classifier = KerasClassifier(model=model, clip_values=(0,30))
 
@@ -108,8 +111,10 @@ X_train = X_train.astype('float32')
 X_test = X_test.astype('float32')
 
 #%% Train the ART classifier
-history = classifier.fit(X_train, y_train, nb_epochs=10)
-
+start = time.time()
+history = classifier.fit(X_train, y_train, nb_epochs=15, batch_size=32)
+end = time.time()
+print("Training time: {0}".format(end-start))
 #%% Evaluate performance for clean data
 y_test = pd.read_csv("/Users/stoye/sciebo/Studium/39-Inf-DL - Deep Learning/projects/project_1_deep_learning/data/Test.csv")
 labels = y_test["ClassId"].values
@@ -125,18 +130,33 @@ pred = model.predict(X_test)
 pred = np.argmax(pred,axis=1)
 print(accuracy_score(labels, pred))
 
-#%% Create attacked data
-attack = FastGradientMethod(estimator=classifier, eps=5, eps_step=2)
+#%% Attack 1: Fast Gradient Method
+attack_fast_gradient = FastGradientMethod(estimator=classifier, eps=7, eps_step=3)
 X_test = X_test.astype('float32')
-x_test_adv = attack.generate(x=X_test)
+x_test_adv_fast_gradient = attack_fast_gradient.generate(x=X_test)
 
-#%% Evaluate performance for attacked data
-predictions = classifier.predict(x_test_adv)
+# Evaluate performance for attacked data
+predictions = classifier.predict(x_test_adv_fast_gradient)
 predictions = np.argmax(predictions,axis=1)
 accuracy_test = accuracy_score(labels, predictions)
-perturbation = np.mean(np.abs((x_test_adv - X_test)))
+perturbation = np.mean(np.abs((x_test_adv_fast_gradient - X_test)))
+print('Accuracy on adversarial test data: {:4.5f}%'.format(accuracy_test * 100))
+print('Average perturbation: {:4.5f}'.format(perturbation))
+
+#%% Attack 2: Pixel Attack -> takes forever (nach 1 Stunde abgebrochen)
+attack_few_pixel = PixelAttack(classifier=classifier)#, th=10)
+X_test = X_test.astype('float32')
+x_test_adv_few_pixel = attack_few_pixel.generate(x=X_test)
+
+# Evaluate performance for attacked data
+predictions = classifier.predict(x_test_adv_few_pixel)
+predictions = np.argmax(predictions,axis=1)
+accuracy_test = accuracy_score(labels, predictions)
+perturbation = np.mean(np.abs((x_test_adv_few_pixel - X_test)))
 print('Accuracy on adversarial test data: {:4.2f}%'.format(accuracy_test * 100))
 print('Average perturbation: {:4.2f}'.format(perturbation))
+
+#%% Attack 3
 
 #%% Visualize one attacked image, doesn't work yet
 plt.matshow(x_test_adv[0])
@@ -187,7 +207,6 @@ image_42.show()
 
 #%%
 #%%
-attack = PixelAttack(classifier=classifier)
 
 
 
