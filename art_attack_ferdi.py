@@ -144,7 +144,7 @@ print('Accuracy on adversarial test data: {:4.5f}%'.format(accuracy_test * 100))
 print('Average perturbation: {:4.5f}'.format(perturbation))
 
 #%% Attack 2: Pixel Attack -> takes forever (nach 1 Stunde abgebrochen)
-attack_few_pixel = PixelAttack(classifier=classifier)#, th=10)
+attack_few_pixel = PixelAttack(classifier=classifier)#, th=1)#, th=10)
 X_test = X_test.astype('float32')
 x_test_adv_few_pixel = attack_few_pixel.generate(x=X_test)
 
