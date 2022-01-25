@@ -84,6 +84,7 @@ y_test = to_categorical(y_test, 43)
 
 #%% Building the Model
 # Here we should source the model_x file for the creation of the different models
+tf.compat.v1.disable_eager_execution() # to make the classifier work, has to be executed before the model is built
 # This is model_1:
 model = Sequential()
 model.add(Conv2D(filters=32, kernel_size=(5,5), activation='relu', input_shape=X_train.shape[1:]))
@@ -103,8 +104,6 @@ model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accur
 model.summary()
 
 #%% Create the ART classifier 
-# -> for some reason, the model has to be created a second time for this to work
-tf.compat.v1.disable_eager_execution() # to make the classifier work
 classifier = KerasClassifier(model=model, clip_values=(0,30))
 
 X_train = X_train.astype('float32')
@@ -145,7 +144,6 @@ print('Average perturbation: {:4.5f}'.format(perturbation))
 
 #%% Attack 2: Pixel Attack -> takes forever (nach 1 Stunde abgebrochen)
 attack_few_pixel = PixelAttack(classifier=classifier)#, th=1)#, th=10)
-X_test = X_test.astype('float32')
 x_test_adv_few_pixel = attack_few_pixel.generate(x=X_test)
 
 # Evaluate performance for attacked data
@@ -156,14 +154,39 @@ perturbation = np.mean(np.abs((x_test_adv_few_pixel - X_test)))
 print('Accuracy on adversarial test data: {:4.2f}%'.format(accuracy_test * 100))
 print('Average perturbation: {:4.2f}'.format(perturbation))
 
-#%% Attack 3
 
-#%% Visualize one attacked image, doesn't work yet
-plt.matshow(x_test_adv[0])
-plt.show()
+#%% plot a picture and its attacked version
+plt.imshow(X_test[42].squeeze().astype(int))
 
-plt.matshow(X_test[0])
-plt.show()
+plt.imshow(x_test_adv_fast_gradient[42].squeeze().astype(int))
+
+#%% Attack 3: Backdoor Attack: Data poisoning
+# Code adapted from: https://github.com/Trusted-AI/adversarial-robustness-toolbox/blob/main/notebooks/poisoning_attack_backdoor_image.ipynb
+from art.attacks.poisoning import PoisoningAttackBackdoor
+from art.attacks.poisoning.perturbations import insert_image
+
+
+# We have to declare an image that we want to be backdoored.
+# We want to manipulate pictures such that the 120 sign gets detected, so we take
+# data/Train/8/00008_00000_00014.png as the backdoor image
+attack_backdoor_poisoning = PoisoningAttackBackdoor(lambda x: insert_image(x, 
+                                                                 backdoor_path='Train/8/00008_00000_00014.png',
+                                                                 size=(10,10),
+                                                                 mode='RGB', blend=0.8, random=True
+                                                                ))
+poisoned_x, poisoned_y = attack_backdoor_poisoning.poison(X_test, labels)
+
+# Evaluate performance for attacked data
+predictions = classifier.predict(poisoned_x)
+predictions = np.argmax(predictions,axis=1)
+accuracy_test = accuracy_score(labels, predictions)
+perturbation = np.mean(np.abs((poisoned_x - X_test)))
+print('Accuracy on adversarial test data: {:4.5f}%'.format(accuracy_test * 100))
+print('Average perturbation: {:4.2f}'.format(perturbation))
+
+#%% Visualize one attacked image with the backdoor attack
+plt.imshow(poisoned_x[42].squeeze())
+
 
 #%% Visualize the performance, doesn't work yet
 
