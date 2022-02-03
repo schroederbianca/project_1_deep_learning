@@ -17,8 +17,6 @@ Created on Thu Jan 13 11:57:22 2022
 #!pip install tensorflow pil
 #!pip install adversarial-robustness-toolbox
 
-
-
 #%% Packages
 
 # analysis
@@ -186,6 +184,49 @@ print('Average perturbation: {:4.2f}'.format(perturbation))
 
 #%% Visualize one attacked image with the backdoor attack
 plt.imshow(poisoned_x[42].squeeze())
+
+
+#%% Attack 4: Alternative Backdoor Attack: Clean Label Backdoor Attack
+# Code adapted from https://github.com/Trusted-AI/adversarial-robustness-toolbox/blob/main/notebooks/poisoning_attack_clean_label_backdoor.ipynb
+from art.attacks.poisoning import PoisoningAttackBackdoor, PoisoningAttackCleanLabelBackdoor
+from art.attacks.poisoning.perturbations import add_pattern_bd
+from art.utils import to_categorical
+from art.estimators.classification import KerasClassifier
+from art.defences.trainer import AdversarialTrainerMadryPGD
+
+
+# Poison training data
+percent_poison = 0.33
+# Shuffle training data
+n_train = np.shape(y_train)[0]
+shuffled_indices = np.arange(n_train)
+np.random.shuffle(shuffled_indices)
+X_train_shuffled = X_train[shuffled_indices]
+y_train_shuffled = y_train[shuffled_indices]
+
+# Now we poison the data, this happens BEFORE the model gets trained
+backdoor = PoisoningAttackBackdoor(add_pattern_bd)
+example_target = np.array([0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, # we want class 8
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0])
+pdata, plabels = backdoor.poison(X_test, y=example_target)
+
+plt.imshow(pdata[42].squeeze().astype(int))
+
+# Poison some percentage of all non-class 8 to class 8
+targets = to_categorical([8], 43)[0] 
+model_clean_label_backdoor = AdversarialTrainerMadryPGD(classifier, nb_epochs=15, eps=0.15, eps_step=0.001)
+model_clean_label_backdoor.fit(X_train_shuffled, y_train_shuffled)
+
+attack_clean_label_backdoor = PoisoningAttackCleanLabelBackdoor(backdoor=backdoor, 
+                                           proxy_classifier=model_clean_label_backdoor.get_classifier(),
+                                           target=targets, pp_poison=percent_poison, norm=2, eps=5,
+                                           eps_step=0.1, max_iter=200)
+pdata, plabels = attack_clean_label_backdoor.poison(X_train_shuffled, y_train_shuffled)
+# This seems to take some time
+
 
 
 #%% Visualize the performance, doesn't work yet
