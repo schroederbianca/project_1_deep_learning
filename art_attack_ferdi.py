@@ -233,6 +233,49 @@ pdata, plabels = attack_clean_label_backdoor.poison(X_train_shuffled, y_train_sh
 
 
 
+
+
+#%% Compare predictions of image 42
+
+def compare_class_predictions(image_number):
+    print(f"Processing image {image_number}...")
+    # original prediction
+    predicted = classifier.predict(X_test)
+    predicted_class_orig = np.argmax(predicted[image_number])
+    print(f"Predicted class using original test data: {predicted_class_orig}")
+
+    # predicted class for this image -> attacked with Fast Gradient
+    predicted_FG = classifier.predict(x_test_adv_fast_gradient)
+    predicted_class_FG = np.argmax(predicted_FG[image_number])
+    print(f"Predicted class using Fast Gradient test data: {predicted_class_FG}")
+
+    # predicted class for this image -> attacked with Few Pixel
+    # MISSING
+
+    # predicted class for this image -> attacked with Backdoor Poisoning
+    predicted_BP = classifier.predict(poisoned_x)
+    predicted_class_BP = np.argmax(predicted_BP[image_number])
+    print(f"Predicted class using Backdoor Poisoning test data: {predicted_class_BP}")
+    
+
+compare_class_predictions(42)
+
+
+
+
+#%%
+
+
+
+
+
+
+
+
+
+
+
+
 #%% Visualize the performance, doesn't work yet
 
 sns.set_style("darkgrid")
