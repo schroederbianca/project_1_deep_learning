@@ -101,6 +101,10 @@ model.add(Dense(43, activation='softmax'))
 model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 model.summary()
 
+#%% plot model architecture
+#from tensorflow.keras.utils import plot_model
+#plot_model(model, to_file='model1.png', rankdir='LR')
+
 #%% Create the ART classifier 
 classifier = KerasClassifier(model=model, clip_values=(0,30))
 
