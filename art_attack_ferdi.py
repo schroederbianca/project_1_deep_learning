@@ -167,6 +167,33 @@ print('Average perturbation: {:4.5f}'.format(perturbation))
 
 plt.imshow(x_test_adv_few_pixel[42].squeeze().astype(int))
 
+#%% Attack 2a: Few Pixel Attack selfmade by Bianca
+#y_test = pd.read_csv("C:/Users/Admin/Documents/Master Data Science/Semester 5/Deep Learning/project_1_deep_learning/data/Test.csv")
+#labels = y_test["ClassId"].values
+#imgs = y_test["Path"].values
+image_data=[]
+th = 4
+for img in imgs:
+    image = Image.open(file_path+"/"+img)
+    image = image.resize((30,30))
+    for i in range(th):
+        position = tuple(np.random.choice(range(30), size=2))
+        new_pixels = tuple(np.random.choice(range(256), size=3))
+        image.putpixel((position),(new_pixels))
+    image_data.append(np.array(image))
+X_test_changed_pixels=np.array(image_data)
+
+# Evaluate performance for attacked data
+predictions = classifier.predict(X_test_changed_pixels.astype('float32'))
+predictions = np.argmax(predictions,axis=1)
+accuracy_test = accuracy_score(labels, predictions)
+perturbation = np.mean(np.abs((X_test_changed_pixels - X_test)))
+print('Accuracy on adversarial test data: {:4.5f}%'.format(accuracy_test * 100))
+print('Average perturbation: {:4.5f}'.format(perturbation))
+
+#%%
+plt.imshow(X_test_changed_pixels[42].squeeze().astype(int))
+
 
 #%% Attack 3: Backdoor Attack: Data poisoning
 # Code adapted from: https://github.com/Trusted-AI/adversarial-robustness-toolbox/blob/main/notebooks/poisoning_attack_backdoor_image.ipynb
@@ -246,7 +273,7 @@ pdata, plabels = attack_clean_label_backdoor.poison(X_train_shuffled, y_train_sh
 def compare_class_predictions(image_number, nb_classes=1):
     print(f"Processing image {image_number}...")
     # original prediction
-    predicted = classifier.predict(X_test)
+    predicted = classifier.predict(X_test.astype('float32'))
     #predicted_class_orig = np.argmax(predicted[image_number])
     predicted_class_orig = predicted[image_number].argsort()[-nb_classes:][::-1]
     print(f"Most likely classes using original test data: {predicted_class_orig}")
@@ -258,7 +285,8 @@ def compare_class_predictions(image_number, nb_classes=1):
     print(f"Most likely classes using Fast Gradient test data: {predicted_class_FG}")
 
     # predicted class for this image -> attacked with Few Pixel
-    predicted_FP = classifier.predict(x_test_adv_few_pixel)
+    #predicted_FP = classifier.predict(x_test_adv_few_pixel)
+    predicted_FP = classifier.predict(X_test_changed_pixels.astype('float32'))
     #predicted_class_FG = np.argmax(predicted_FG[image_number])
     predicted_class_FP = predicted_FP[image_number].argsort()[-nb_classes:][::-1]
     print(f"Most likely classes using Few Pixel test data: {predicted_class_FP}")
@@ -274,6 +302,8 @@ def compare_class_predictions(image_number, nb_classes=1):
 compare_class_predictions(42, 3)
 # for image 2002 there are completly different results!
 
+#%%
+compare_class_predictions(2002, 3)
 
 
 
@@ -286,7 +316,8 @@ def plot_image_versions(image_number):
     plt.imshow(x_test_adv_fast_gradient[image_number].squeeze().astype(int))
     plt.show()
     # few pixel
-    plt.imshow(x_test_adv_few_pixel[image_number].squeeze().astype(int))
+    #plt.imshow(x_test_adv_few_pixel[image_number].squeeze().astype(int))
+    plt.imshow(X_test_changed_pixels[image_number].squeeze().astype(int))
     plt.show()
     # backdoor poisoning
     plt.imshow(poisoned_x[image_number].squeeze())
@@ -297,8 +328,27 @@ def plot_image_versions(image_number):
 plot_image_versions(666)
 
 
+#%% Attack 5: Universal perturbation attack
+# targeted (class 0)
+from art.attacks.evasion import TargetedUniversalPerturbation, UniversalPerturbation
+
+# doesn't work
+#perturbation_attack = TargetedUniversalPerturbation(classifier)
+#x_test_adv_perturbation = perturbation_attack.generate(x=X_test, y=labels)
 
 
+#%%
+# does work (hopefully)
+perturbation_attack = UniversalPerturbation(classifier)
+x_test_adv_perturbation = perturbation_attack.generate(x=X_test)#, y=labels)
+
+# Evaluate performance for attacked data
+predictions = classifier.predict(x_test_adv_perturbation.astype('float32'))
+predictions = np.argmax(predictions,axis=1)
+accuracy_test = accuracy_score(labels, predictions)
+perturbation = np.mean(np.abs((x_test_adv_perturbation - X_test)))
+print('Accuracy on adversarial test data: {:4.5f}%'.format(accuracy_test * 100))
+print('Average perturbation: {:4.5f}'.format(perturbation))
 
 
 
