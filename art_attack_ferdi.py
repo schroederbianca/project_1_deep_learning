@@ -144,23 +144,29 @@ perturbation = np.mean(np.abs((x_test_adv_fast_gradient - X_test)))
 print('Accuracy on adversarial test data: {:4.5f}%'.format(accuracy_test * 100))
 print('Average perturbation: {:4.5f}'.format(perturbation))
 
-#%% Attack 2: Pixel Attack -> takes forever (nach 1 Stunde abgebrochen)
-attack_few_pixel = PixelAttack(classifier=classifier)#, th=1)#, th=10)
-x_test_adv_few_pixel = attack_few_pixel.generate(x=X_test)
-
-# Evaluate performance for attacked data
-predictions = classifier.predict(x_test_adv_few_pixel)
-predictions = np.argmax(predictions,axis=1)
-accuracy_test = accuracy_score(labels, predictions)
-perturbation = np.mean(np.abs((x_test_adv_few_pixel - X_test)))
-print('Accuracy on adversarial test data: {:4.2f}%'.format(accuracy_test * 100))
-print('Average perturbation: {:4.2f}'.format(perturbation))
-
-
 #%% plot a picture and its attacked version
 plt.imshow(X_test[42].squeeze().astype(int))
 
 plt.imshow(x_test_adv_fast_gradient[42].squeeze().astype(int))
+
+#%% Attack 2: Pixel Attack -> takes forever (nach 1 Stunde abgebrochen)
+n_examples = 1000
+attack_few_pixel = PixelAttack(classifier=classifier, th=4)#, th=10)
+x_test_adv_few_pixel = attack_few_pixel.generate(x=X_test[0:n_examples].astype(int), max_iter=5)
+
+# Evaluate performance for attacked data
+predictions = classifier.predict(x_test_adv_few_pixel)
+predictions = np.argmax(predictions,axis=1)
+accuracy_test = accuracy_score(labels[0:n_examples], predictions)
+perturbation = np.mean(np.abs((x_test_adv_few_pixel[0:n_examples] - X_test[0:n_examples])))
+print('Accuracy on adversarial test data: {:4.5f}%'.format(accuracy_test * 100))
+print('Average perturbation: {:4.5f}'.format(perturbation))
+
+#%% plot a picture and its attacked version
+#plt.imshow(X_test[42].squeeze().astype(int))
+
+plt.imshow(x_test_adv_few_pixel[42].squeeze().astype(int))
+
 
 #%% Attack 3: Backdoor Attack: Data poisoning
 # Code adapted from: https://github.com/Trusted-AI/adversarial-robustness-toolbox/blob/main/notebooks/poisoning_attack_backdoor_image.ipynb
@@ -237,34 +243,58 @@ pdata, plabels = attack_clean_label_backdoor.poison(X_train_shuffled, y_train_sh
 
 #%% Compare predictions of image 42
 
-def compare_class_predictions(image_number):
+def compare_class_predictions(image_number, nb_classes=1):
     print(f"Processing image {image_number}...")
     # original prediction
     predicted = classifier.predict(X_test)
-    predicted_class_orig = np.argmax(predicted[image_number])
-    print(f"Predicted class using original test data: {predicted_class_orig}")
+    #predicted_class_orig = np.argmax(predicted[image_number])
+    predicted_class_orig = predicted[image_number].argsort()[-nb_classes:][::-1]
+    print(f"Most likely classes using original test data: {predicted_class_orig}")
 
     # predicted class for this image -> attacked with Fast Gradient
     predicted_FG = classifier.predict(x_test_adv_fast_gradient)
-    predicted_class_FG = np.argmax(predicted_FG[image_number])
-    print(f"Predicted class using Fast Gradient test data: {predicted_class_FG}")
+    #predicted_class_FG = np.argmax(predicted_FG[image_number])
+    predicted_class_FG = predicted_FG[image_number].argsort()[-nb_classes:][::-1]
+    print(f"Most likely classes using Fast Gradient test data: {predicted_class_FG}")
 
     # predicted class for this image -> attacked with Few Pixel
-    # MISSING
-
+    predicted_FP = classifier.predict(x_test_adv_few_pixel)
+    #predicted_class_FG = np.argmax(predicted_FG[image_number])
+    predicted_class_FP = predicted_FP[image_number].argsort()[-nb_classes:][::-1]
+    print(f"Most likely classes using Few Pixel test data: {predicted_class_FP}")
+    
     # predicted class for this image -> attacked with Backdoor Poisoning
     predicted_BP = classifier.predict(poisoned_x)
-    predicted_class_BP = np.argmax(predicted_BP[image_number])
-    print(f"Predicted class using Backdoor Poisoning test data: {predicted_class_BP}")
+    #predicted_class_BP = np.argmax(predicted_BP[image_number])
+    predicted_class_BP = predicted_BP[image_number].argsort()[-nb_classes:][::-1]
+
+    print(f"Most likely classes using Backdoor Poisoning test data: {predicted_class_BP}")
     
 
-compare_class_predictions(42)
+compare_class_predictions(42, 3)
+# for image 2002 there are completly different results!
 
 
+
+
+#%% Plot an image and its attacked versions (from test set)
+def plot_image_versions(image_number):
+    # original
+    plt.imshow(X_test[image_number].squeeze().astype(int))
+    plt.show()
+    # fast gradient
+    plt.imshow(x_test_adv_fast_gradient[image_number].squeeze().astype(int))
+    plt.show()
+    # few pixel
+    plt.imshow(x_test_adv_few_pixel[image_number].squeeze().astype(int))
+    plt.show()
+    # backdoor poisoning
+    plt.imshow(poisoned_x[image_number].squeeze())
+    plt.show()
 
 
 #%%
-
+plot_image_versions(666)
 
 
 
