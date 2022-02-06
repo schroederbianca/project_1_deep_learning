@@ -210,7 +210,7 @@ plt.imshow(X_test_changed_pixels[42].squeeze().astype(int))
 from art.attacks.poisoning import PoisoningAttackBackdoor
 from art.attacks.poisoning.perturbations import insert_image
 
-
+#%%
 # We have to declare an image that we want to be backdoored.
 # We want to manipulate pictures such that the 120 sign gets detected, so we take
 # data/Train/8/00008_00000_00014.png as the backdoor image
@@ -513,7 +513,7 @@ def create_model_3(verbose=True):
 
 #%%
 
-def attack_model(model, attack, X_train, X_test, y_train, y_test, labels, epochs=15, verbose=True):
+def train_model(model, X_train, X_test, y_train, y_test, labels, epochs=15, verbose=True):
     if model == 'model_1':
         model = create_model_1()
     elif model == 'model_2':
@@ -524,16 +524,10 @@ def attack_model(model, attack, X_train, X_test, y_train, y_test, labels, epochs
         return "Error: Please choose from ['model_1, 'model_2', 'model_3']"
     
     
-    if attack == 'few_pixel_rand':
-        start = time.time()
-        history = model.fit(X_train.astype('float32'), y_train, nb_epochs=epochs, batch_size=32)
-        end = time.time()
-        classifier = model
-    else:
-        classifier = KerasClassifier(model=model, clip_values=(0,30))
-        start = time.time()
-        history = classifier.fit(X_train.astype('float32'), y_train, nb_epochs=epochs, batch_size=32)
-        end = time.time()
+    classifier = KerasClassifier(model=model, clip_values=(0,30))
+    start = time.time()
+    history = classifier.fit(X_train.astype('float32'), y_train, nb_epochs=epochs, batch_size=32)
+    end = time.time()
     if verbose:
         print("Training time: {0}".format(end-start))
         
@@ -552,8 +546,12 @@ def attack_model(model, attack, X_train, X_test, y_train, y_test, labels, epochs
     pred = np.argmax(pred,axis=1)
     print(f"Accuracy for clean data: {accuracy_score(labels, pred)}")
     
+    return classifier
     
-    
+
+def attack_model(classifier, attack, X_test, verbose=True): 
+    y_test = pd.read_csv("/Users/stoye/sciebo/Studium/39-Inf-DL - Deep Learning/projects/project_1_deep_learning/data/Test.csv")
+    labels = y_test["ClassId"].values
     if attack == None:
         pass
     elif attack == 'fgm':
@@ -582,7 +580,7 @@ def attack_model(model, attack, X_train, X_test, y_train, y_test, labels, epochs
         attack = PoisoningAttackBackdoor(lambda x: insert_image(x, 
                     backdoor_path='Train/8/00008_00000_00014.png', size=(10,10),
                     mode='RGB', blend=0.8, random=True))
-        poisoned_x, poisoned_y = attack.poison(X_test, labels)
+        attacked_data, poisoned_y = attack.poison(X_test, labels)
     elif attack == 'universal_perturbation':
         attack = UniversalPerturbation(classifier, attacker='fgsm', eps=10, max_iter=10,
                                                     norm='inf', delta=0.4, batch_size=128)
@@ -591,30 +589,17 @@ def attack_model(model, attack, X_train, X_test, y_train, y_test, labels, epochs
     else:
         return "Error: Please choose from [None, 'fgm, 'few_pixel_opt', 'few_pixel_rand', 'backdoor_poison', 'universal_perturbation']"
 
-    X_train = X_train.astype('float32')
     X_test = X_test.astype('float32')
 
 
-
-
-
-    if attack == 'backdoor_poison':
-        # Evaluate performance for attacked data
-        predictions = classifier.predict(poisoned_x)
-        predictions = np.argmax(predictions,axis=1)
-        accuracy_test = accuracy_score(labels, predictions)
-        perturbation = np.mean(np.abs((poisoned_x - X_test)))
-        print('Accuracy on adversarial test data: {:4.5f}%'.format(accuracy_test * 100))
-        print('Average perturbation: {:4.2f}'.format(perturbation))
-    
-    else:
-        # Evaluate performance for attacked data
-        predictions = model.predict(attacked_data)#.astype('float32'))
-        predictions = np.argmax(predictions,axis=1)
-        accuracy_test = accuracy_score(labels, predictions)
-        perturbation = np.mean(np.abs((attacked_data - X_test)))
-        print('Accuracy on adversarial test data: {:4.5f}%'.format(accuracy_test * 100))
-        print('Average perturbation: {:4.5f}'.format(perturbation))
+   
+    # Evaluate performance for attacked data
+    predictions = model.predict(attacked_data)#.astype('float32'))
+    predictions = np.argmax(predictions,axis=1)
+    accuracy_test = accuracy_score(labels, predictions)
+    perturbation = np.mean(np.abs((attacked_data - X_test)))
+    print('Accuracy on adversarial test data: {:4.5f}%'.format(accuracy_test * 100))
+    print('Average perturbation: {:4.5f}'.format(perturbation))
 
     return [accuracy_test, perturbation]
 
@@ -624,11 +609,14 @@ def attack_model(model, attack, X_train, X_test, y_train, y_test, labels, epochs
 
 #%%
 
+model_1 = train_model('model_1', X_train, X_test, y_train, y_test, labels, epochs=3, verbose=True)
+#%%
+attack_m1_fgm = attack_model(model_1, 'fgm', X_test)
+print(attack_m1_fgm)
 
-attack_m1_fgm = attack_model('model_1', 'fgm', X_train, X_test, y_train, y_test, labels, epochs=3)
-
-
-
+#%%
+attack_m1_backdoor_poison = attack_model(model_1, 'backdoor_poison', X_test)
+print(attack_m1_backdoor_poison)
 
 #%%
 
