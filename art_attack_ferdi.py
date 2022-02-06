@@ -80,9 +80,19 @@ print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
 y_train = to_categorical(y_train, 43)
 y_test = to_categorical(y_test, 43)
 
+tf.compat.v1.disable_eager_execution() # to make the classifier work, has to be executed before the model is built
+
+
+
+
+
+
+
+
+
+
 #%% Building the Model
 # Here we should source the model_x file for the creation of the different models
-tf.compat.v1.disable_eager_execution() # to make the classifier work, has to be executed before the model is built
 # This is model_1:
 model = Sequential()
 model.add(Conv2D(filters=32, kernel_size=(5,5), activation='relu', input_shape=X_train.shape[1:]))
@@ -184,7 +194,7 @@ for img in imgs:
 X_test_changed_pixels=np.array(image_data)
 
 # Evaluate performance for attacked data
-predictions = classifier.predict(X_test_changed_pixels.astype('float32'))
+predictions = model.predict(X_test_changed_pixels)#.astype('float32'))
 predictions = np.argmax(predictions,axis=1)
 accuracy_test = accuracy_score(labels, predictions)
 perturbation = np.mean(np.abs((X_test_changed_pixels - X_test)))
@@ -224,6 +234,7 @@ plt.imshow(poisoned_x[42].squeeze())
 
 
 #%% Attack 4: Alternative Backdoor Attack: Clean Label Backdoor Attack
+# takes very long
 # Code adapted from https://github.com/Trusted-AI/adversarial-robustness-toolbox/blob/main/notebooks/poisoning_attack_clean_label_backdoor.ipynb
 from art.attacks.poisoning import PoisoningAttackBackdoor, PoisoningAttackCleanLabelBackdoor
 from art.attacks.poisoning.perturbations import add_pattern_bd
@@ -300,7 +311,7 @@ def compare_class_predictions(image_number, nb_classes=1):
     
 
 compare_class_predictions(42, 3)
-# for image 2002 there are completly different results!
+# for image 2002 there are completely different results!
 
 #%%
 compare_class_predictions(2002, 3)
@@ -322,6 +333,9 @@ def plot_image_versions(image_number):
     # backdoor poisoning
     plt.imshow(poisoned_x[image_number].squeeze())
     plt.show()
+    # universal perturbation
+    plt.imshow(x_test_adv_perturbation[image_number].squeeze())
+    plt.show()
 
 
 #%%
@@ -338,9 +352,11 @@ from art.attacks.evasion import TargetedUniversalPerturbation, UniversalPerturba
 
 
 #%%
-# does work (hopefully)
-perturbation_attack = UniversalPerturbation(classifier)
-x_test_adv_perturbation = perturbation_attack.generate(x=X_test)#, y=labels)
+# does work (does still take some time)
+perturbation_attack = UniversalPerturbation(classifier, attacker='fgsm', eps=10, max_iter=10,
+                                            norm='inf', delta=0.4, batch_size=128)
+x_test_adv_perturbation = perturbation_attack.generate(x=X_test/255,
+                                                       max_iter=5)#, y=labels)
 
 # Evaluate performance for attacked data
 predictions = classifier.predict(x_test_adv_perturbation.astype('float32'))
@@ -351,8 +367,16 @@ print('Accuracy on adversarial test data: {:4.5f}%'.format(accuracy_test * 100))
 print('Average perturbation: {:4.5f}'.format(perturbation))
 
 
+#%%
+plt.imshow(perturbation_attack.noise.squeeze())
+#%%
+plt.imshow(X_test[42].squeeze()/255)
 
+#%%
+plt.imshow(x_test_adv_perturbation[42].squeeze())
 
+#%%
+print(X_test[42]/255)
 
 
 
@@ -397,9 +421,211 @@ image_42.show()
 
 
 #%%
+
+def create_model_1(verbose=True):
+    model = Sequential()
+    model.add(Conv2D(filters=32, kernel_size=(5,5), activation='relu', input_shape=X_train.shape[1:]))
+    model.add(Conv2D(filters=32, kernel_size=(5,5), activation='relu'))
+    model.add(MaxPool2D(pool_size=(2, 2)))
+    model.add(Dropout(rate=0.25))
+    model.add(Conv2D(filters=64, kernel_size=(3, 3), activation='relu'))
+    model.add(Conv2D(filters=64, kernel_size=(3, 3), activation='relu'))
+    model.add(MaxPool2D(pool_size=(2, 2)))
+    model.add(Dropout(rate=0.25))
+    model.add(Flatten())
+    model.add(Dense(256, activation='relu'))
+    model.add(Dropout(rate=0.5))
+    model.add(Dense(43, activation='softmax'))
+    #Compilation of the model
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+    if verbose:
+        print(model.summary())
+    return model
+    
+def create_model_2(verbose=True):
+    model = Sequential()
+    chanDim = -1
+    # CONV => RELU => BN => POOL
+    model.add(Conv2D(8, (5, 5), padding="same",input_shape=X_train.shape[1:]))
+    model.add(tf.keras.layers.Activation("relu"))
+    model.add(tf.keras.layers.BatchNormalization(axis=chanDim))
+    model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2)))
+    # first set of (CONV => RELU => CONV => RELU) * 2 => POOL
+    model.add(Conv2D(16, (3, 3), padding="same"))
+    model.add(tf.keras.layers.Activation("relu"))
+    model.add(tf.keras.layers.BatchNormalization(axis=chanDim))
+    model.add(Conv2D(16, (3, 3), padding="same"))
+    model.add(tf.keras.layers.Activation("relu"))
+    model.add(tf.keras.layers.BatchNormalization(axis=chanDim))
+    model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2)))
+    # second set of (CONV => RELU => CONV => RELU) * 2 => POOL
+    model.add(Conv2D(32, (3, 3), padding="same"))
+    model.add(tf.keras.layers.Activation("relu"))
+    model.add(tf.keras.layers.BatchNormalization(axis=chanDim))
+    model.add(Conv2D(32, (3, 3), padding="same"))
+    model.add(tf.keras.layers.Activation("relu"))
+    model.add(tf.keras.layers.BatchNormalization(axis=chanDim))
+    model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2)))
+    # first set of FC => RELU layers
+    model.add(Flatten())
+    model.add(Dense(128))
+    model.add(tf.keras.layers.Activation("relu"))
+    model.add(tf.keras.layers.BatchNormalization())
+    model.add(Dropout(0.5))
+    # second set of FC => RELU layers
+    model.add(Flatten())
+    model.add(Dense(128))
+    model.add(tf.keras.layers.Activation("relu"))
+    model.add(tf.keras.layers.BatchNormalization())
+    model.add(Dropout(0.5))
+    # softmax classifier
+    model.add(Dense(classes))
+    model.add(tf.keras.layers.Activation("softmax"))
+    model.compile(loss="categorical_crossentropy", optimizer='adam', metrics=["accuracy"])
+    if verbose:
+        print(model.summary())
+    return model
+    
+def create_model_3(verbose=True):
+    model = tf.keras.models.Sequential()
+
+    ## Build Model
+    # 1st Conv layer 
+    model.add(tf.keras.layers.Conv2D(32, kernel_size = (3, 3), activation = 'relu', padding = 'same', input_shape = X_train.shape[1:]))
+    model.add(tf.keras.layers.Conv2D(32, kernel_size = (3, 3), activation = 'relu', padding = 'same'))
+    model.add(tf.keras.layers.MaxPool2D(pool_size = (2, 2)))
+    # 2nd Conv layer        
+    model.add(tf.keras.layers.Conv2D(64, kernel_size = (3, 3), activation = 'relu', padding = 'same'))
+    model.add(tf.keras.layers.Conv2D(64, kernel_size = (3, 3), activation = 'relu', padding = 'same'))
+    model.add(tf.keras.layers.MaxPool2D(pool_size = (2, 2)))
+    # Fully Connected layer        
+    model.add(tf.keras.layers.Flatten())
+    model.add(tf.keras.layers.Dense(256))
+    model.add(tf.keras.layers.Dropout(0.5))
+    model.add(tf.keras.layers.Dense(43, activation="softmax"))
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+    if verbose:
+        print(model.summary())
+    return model
+
+
+
+#%%
+
+def attack_model(model, attack, X_train, X_test, y_train, y_test, labels, epochs=15, verbose=True):
+    if model == 'model_1':
+        model = create_model_1()
+    elif model == 'model_2':
+        model = create_model_2()
+    elif model == 'model_3':
+        model = create_model_3()
+    else:
+        return "Error: Please choose from ['model_1, 'model_2', 'model_3']"
+    
+    
+    if attack == 'few_pixel_rand':
+        start = time.time()
+        history = model.fit(X_train.astype('float32'), y_train, nb_epochs=epochs, batch_size=32)
+        end = time.time()
+        classifier = model
+    else:
+        classifier = KerasClassifier(model=model, clip_values=(0,30))
+        start = time.time()
+        history = classifier.fit(X_train.astype('float32'), y_train, nb_epochs=epochs, batch_size=32)
+        end = time.time()
+    if verbose:
+        print("Training time: {0}".format(end-start))
+        
+    # prediction for clean data
+    y_test = pd.read_csv("/Users/stoye/sciebo/Studium/39-Inf-DL - Deep Learning/projects/project_1_deep_learning/data/Test.csv")
+    labels = y_test["ClassId"].values
+    imgs = y_test["Path"].values
+    data=[]
+    for img in imgs:
+        image = Image.open(img)
+        image = image.resize((30,30))
+        data.append(np.array(image))
+    X_test=np.array(data)
+
+    pred = model.predict(X_test)
+    pred = np.argmax(pred,axis=1)
+    print(f"Accuracy for clean data: {accuracy_score(labels, pred)}")
+    
+    
+    
+    if attack == None:
+        pass
+    elif attack == 'fgm':
+        attack = FastGradientMethod(estimator=classifier, eps=7, eps_step=3)
+        attacked_data = attack.generate(x=X_test.astype('float32'))
+    elif attack == 'few_pixel_opt':
+        n_examples = 1000
+        attack = PixelAttack(classifier=classifier, th=4)#, th=10)
+        attacked_data = attack.generate(x=X_test[0:n_examples].astype(int), max_iter=5)
+    elif attack == 'few_pixel_rand':
+        file_path = "/Users/stoye/sciebo/Studium/39-Inf-DL - Deep Learning/projects/project_1_deep_learning/data"
+        imgs = y_test["Path"].values
+        #cur_path = os.getcwd() 
+        image_data=[]
+        th = 4
+        for img in imgs:
+            image = Image.open(file_path+"/"+img)
+            image = image.resize((30,30))
+            for i in range(th):
+                position = tuple(np.random.choice(range(30), size=2))
+                new_pixels = tuple(np.random.choice(range(256), size=3))
+                image.putpixel((position),(new_pixels))
+            image_data.append(np.array(image))
+        attacked_data = np.array(image_data)
+    elif attack == 'backdoor_poison':
+        attack = PoisoningAttackBackdoor(lambda x: insert_image(x, 
+                    backdoor_path='Train/8/00008_00000_00014.png', size=(10,10),
+                    mode='RGB', blend=0.8, random=True))
+        poisoned_x, poisoned_y = attack.poison(X_test, labels)
+    elif attack == 'universal_perturbation':
+        attack = UniversalPerturbation(classifier, attacker='fgsm', eps=10, max_iter=10,
+                                                    norm='inf', delta=0.4, batch_size=128)
+        attacked_data = attack.generate(x=X_test/255,
+                                                               max_iter=5)#, y=labels)
+    else:
+        return "Error: Please choose from [None, 'fgm, 'few_pixel_opt', 'few_pixel_rand', 'backdoor_poison', 'universal_perturbation']"
+
+    X_train = X_train.astype('float32')
+    X_test = X_test.astype('float32')
+
+
+
+
+
+    if attack == 'backdoor_poison':
+        # Evaluate performance for attacked data
+        predictions = classifier.predict(poisoned_x)
+        predictions = np.argmax(predictions,axis=1)
+        accuracy_test = accuracy_score(labels, predictions)
+        perturbation = np.mean(np.abs((poisoned_x - X_test)))
+        print('Accuracy on adversarial test data: {:4.5f}%'.format(accuracy_test * 100))
+        print('Average perturbation: {:4.2f}'.format(perturbation))
+    
+    else:
+        # Evaluate performance for attacked data
+        predictions = model.predict(attacked_data)#.astype('float32'))
+        predictions = np.argmax(predictions,axis=1)
+        accuracy_test = accuracy_score(labels, predictions)
+        perturbation = np.mean(np.abs((attacked_data - X_test)))
+        print('Accuracy on adversarial test data: {:4.5f}%'.format(accuracy_test * 100))
+        print('Average perturbation: {:4.5f}'.format(perturbation))
+
+    return [accuracy_test, perturbation]
+
+
+
+
+
 #%%
 
 
+attack_m1_fgm = attack_model('model_1', 'fgm', X_train, X_test, y_train, y_test, labels, epochs=3)
 
 
 
