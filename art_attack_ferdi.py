@@ -137,6 +137,7 @@ for img in imgs:
     data.append(np.array(image))
 X_test=np.array(data)
 
+#%%
 pred = model.predict(X_test)
 pred = np.argmax(pred,axis=1)
 print(accuracy_score(labels, pred))
@@ -202,7 +203,7 @@ print('Accuracy on adversarial test data: {:4.5f}%'.format(accuracy_test * 100))
 print('Average perturbation: {:4.5f}'.format(perturbation))
 
 #%%
-plt.imshow(X_test_changed_pixels[42].squeeze().astype(int))
+plt.imshow(X_test_changed_pixels[1].squeeze().astype(int))
 
 
 #%% Attack 3: Backdoor Attack: Data poisoning
@@ -306,6 +307,11 @@ def compare_class_predictions(image_number, nb_classes=1):
     predicted_BP = classifier.predict(poisoned_x)
     #predicted_class_BP = np.argmax(predicted_BP[image_number])
     predicted_class_BP = predicted_BP[image_number].argsort()[-nb_classes:][::-1]
+    
+    # predicted class for this image -> attacked with Backdoor Poisoning
+    predicted_UP = classifier.predict(x_test_adv_perturbation)
+    #predicted_class_BP = np.argmax(predicted_BP[image_number])
+    predicted_class_UP = predicted_UP[image_number].argsort()[-nb_classes:][::-1]
 
     print(f"Most likely classes using Backdoor Poisoning test data: {predicted_class_BP}")
     
@@ -370,10 +376,10 @@ print('Average perturbation: {:4.5f}'.format(perturbation))
 #%%
 plt.imshow(perturbation_attack.noise.squeeze())
 #%%
-plt.imshow(X_test[42].squeeze()/255)
+plt.imshow(X_test[1].squeeze()/255)
 
 #%%
-plt.imshow(x_test_adv_perturbation[42].squeeze())
+plt.imshow(x_test_adv_perturbation[1].squeeze())
 
 #%%
 print(X_test[42]/255)
