@@ -161,7 +161,7 @@ def attack_model(classifier, attack, X_test, verbose=True):
         attack_obj = PoisoningAttackBackdoor(lambda x: insert_image(x, 
                     backdoor_path='Train/8/00008_00000_00014.png', size=(10,10),
                     mode='RGB', blend=0.8, random=True))
-        attacked_data, poisoned_y = attack_obj.poison(X_test, labels)
+        attacked_data, poisoned_y = attack_obj.poison(X_test.astype('float32'), labels)
     elif attack == 'universal_perturbation':
         start = time.time()
         attack_obj = UniversalPerturbation(classifier, attacker='fgsm', eps=10, max_iter=10,
@@ -218,37 +218,36 @@ def plot_image(data, image_number, mode='int'):
 def compare_class_predictions(image_number, nb_classes=3):
         print(f"Processing image {image_number}...")
         # original prediction
-        predicted = model_3.predict(X_test[image_number].astype('float32'))
-        predicted_class_orig = predicted.argsort()[-nb_classes:][::-1]
+        predicted = model_1.predict(X_test.astype('float32'))
+        predicted_class_orig = predicted[image_number].argsort()[-nb_classes:][::-1]
         print(f"Most likely classes using original test data: {predicted_class_orig}")
     
         # predicted class for this image -> attacked with Fast Gradient
-        predicted_FG = model_3.predict(attack_m3_fgm[image_number].astype('float32'))
-        predicted_class_FG = predicted_FG.argsort()[-nb_classes:][::-1]
+        predicted_FG = model_1.predict(attack_m3_fgm[2].astype('float32'))
+        predicted_class_FG = predicted_FG[image_number].argsort()[-nb_classes:][::-1]
         print(f"Most likely classes using Fast Gradient test data: {predicted_class_FG}")
     
         # predicted class for this image -> attacked with Few Pixel
         #predicted_FP = classifier.predict(x_test_adv_few_pixel)
-        predicted_FPO = model_3.predict(attack_m3_fpo[image_number].astype('float32'))
-        predicted_class_FPO = predicted_FPO.argsort()[-nb_classes:][::-1]
+        predicted_FPO = model_1.predict(attack_m3_fpo[2].astype('float32'))
+        predicted_class_FPO = predicted_FPO[image_number].argsort()[-nb_classes:][::-1]
         print(f"Most likely classes using optimized Few Pixel test data: {predicted_class_FPO}")
         
         # predicted class for this image -> attacked with Few Pixel
         #predicted_FP = classifier.predict(x_test_adv_few_pixel)
-        predicted_FPR = model_3.predict(attack_m3_fpr[image_number].astype('float32'))
-        predicted_class_FPR = predicted_FPR.argsort()[-nb_classes:][::-1]
+        predicted_FPR = model_1.predict(attack_m3_fpr[2].astype('float32'))
+        predicted_class_FPR = predicted_FPR[image_number].argsort()[-nb_classes:][::-1]
         print(f"Most likely classes using randomized Few Pixel test data: {predicted_class_FPR}")
     
         # predicted class for this image -> attacked with Backdoor Poisoning
-        predicted_BP = model_3.predict(attack_m3_bp[image_number].astype('float32'))
-        predicted_class_BP = predicted_BP.argsort()[-nb_classes:][::-1]
+        predicted_BP = model_1.predict(attack_m3_bp[2].astype('float32'))
+        predicted_class_BP = predicted_BP[image_number].argsort()[-nb_classes:][::-1]
         print(f"Most likely classes using Backdoor Poisoning test data: {predicted_class_BP}")
 
-        
         # predicted class for this image -> attacked with Universal Perturbation
-        predicted_UP = model_3.predict(attack_m3_up[image_number].astype('float32'))
-        predicted_class_UP = predicted_UP.argsort()[-nb_classes:][::-1]
-        print(f"Most likely classes using Backdoor Poisoning test data: {predicted_class_UP}")
+        predicted_UP = model_1.predict(attack_m3_up[2].astype('float32'))
+        predicted_class_UP = predicted_UP[image_number].argsort()[-nb_classes:][::-1]
+        print(f"Most likely classes using Universal Perturbation test data: {predicted_class_UP}")
 
 
 
@@ -258,19 +257,19 @@ def plot_image_versions(image_number):
     plt.imshow(X_test[image_number].squeeze().astype(int))
     plt.show()
     # fast gradient
-    plt.imshow(attack_m3_fgm[2][image_number].squeeze().astype(int))
+    plt.imshow(attack_m1_fgm[2][image_number].squeeze().astype(int))
     plt.show()
     # few pixel optimized
-    plt.imshow(attack_m3_fpo[2][image_number].squeeze().astype(int))
+    plt.imshow(attack_m1_fpo[2][image_number].squeeze().astype(int))
     plt.show()
     # few pixel randomized
-    plt.imshow(attack_m3_fpr[2][image_number].squeeze().astype(int))
+    plt.imshow(attack_m1_fpr[2][image_number].squeeze().astype(int))
     plt.show()
     # backdoor poisoning
-    plt.imshow(attack_m3_bp[2][image_number].squeeze())
+    plt.imshow(attack_m1_bp[2][image_number].squeeze())
     plt.show()
     # universal perturbation
-    plt.imshow(attack_m3_up[2][image_number].squeeze()/255)
+    plt.imshow(attack_m1_up[2][image_number].squeeze())
     plt.show()
 
 
@@ -458,11 +457,14 @@ print("Attack model_3 with Universal Perturbation attack:")
 print(f"Accuracy on attacked data: {attack_m3_up[0]}")
 print(f"Average perturbation on attacked data: {attack_m3_up[1]}")
 
-#%%
+#%% Class predictions
+compare_class_predictions(1)
 
+
+#%% Image versions
 
 ## Print image 42
-plot_image_versions(42)
+plot_image_versions(1)
 
 
 

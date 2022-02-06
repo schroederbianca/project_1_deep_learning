@@ -220,10 +220,10 @@ attack_backdoor_poisoning = PoisoningAttackBackdoor(lambda x: insert_image(x,
                                                                  size=(10,10),
                                                                  mode='RGB', blend=0.8, random=True
                                                                 ))
-poisoned_x, poisoned_y = attack_backdoor_poisoning.poison(X_test, labels)
+poisoned_x, poisoned_y = attack_backdoor_poisoning.poison(X_test.astype('float32'), labels)
 
 # Evaluate performance for attacked data
-predictions = classifier.predict(poisoned_x)
+predictions = classifier.predict(poisoned_x.astype('float32'))
 predictions = np.argmax(predictions,axis=1)
 accuracy_test = accuracy_score(labels, predictions)
 perturbation = np.mean(np.abs((poisoned_x - X_test)))
